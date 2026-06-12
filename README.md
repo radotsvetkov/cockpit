@@ -4,6 +4,16 @@ soma cockpit is a desktop app that turns a soma project into a readable evidence
 
 If you are an enterprise software architect or part of a team adopting AI agents, the cockpit is where you observe, operate, and govern those agents without trusting a vendor cloud. It pairs with the [soma runtime](https://github.com/radotsvetkov/soma), which is the enforcer that gates and records every action.
 
+## See it
+
+![The soma cockpit timeline, showing real journaled events including a wrapped agent run, an RFC 3161 anchor, and a denied sudo command](assets/cockpit-timeline.png)
+
+The timeline shows every action a governed agent took, in order. The green badge at the top is the live output of `soma log verify`, not a JavaScript reimplementation. In this run you can read the wrapped agent session (`wrap.start` and `wrap.end`, exit 0 in 285ms), the chain head anchored at freetsa.org, the evidence bundle that was exported, and a `sudo` command that policy denied before it could run, flagged in red.
+
+![The cockpit evidence view, listing an exported bundle with a one-click verify action](assets/cockpit-evidence.png)
+
+The evidence view lists exported bundles and anchors, each with a verify action that runs the real check through the runtime. This is the screen you point at when a client, a security team, or an auditor asks what your agents actually did.
+
 ## What the cockpit is, and what it is not
 
 The cockpit is a viewer and a control surface. It is not the thing that enforces policy, and it is not a chat app where you talk to a model.
