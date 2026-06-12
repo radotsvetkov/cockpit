@@ -75,12 +75,14 @@ export function parseNdjson(text) {
 
 /**
  * Tail the journal from a byte offset.
- * Returns {lines: string[], offset: number, size: number}.
+ * Returns {lines, offset, size, mtime}.
  * lines are raw JSONL strings (each parseable as a journal event).
+ * mtime is the journal file's modification time (ms); it changes on in-place
+ * edits even when size is unchanged, so consumers use it to detect tampering.
  *
  * @param {string} root   - project root path
  * @param {number} from   - byte offset from previous call (0 for initial load)
- * @returns {Promise<{lines:string[], offset:number, size:number}>}
+ * @returns {Promise<{lines:string[], offset:number, size:number, mtime:number}>}
  */
 export async function tail(root, from) {
   const invoke = getInvoke();
@@ -307,6 +309,7 @@ export async function somaStream(args, project, handlers) {
 
     // Subscribe before invoking to avoid missing early lines.
     listen('soma-stream', (event) => {
+      /** @type {{run_id?:string, done?:boolean, code?:number, line?:string, stream?:'out'|'err'}} */
       const payload = event.payload;
       if (!payload || payload.run_id !== runId) return;
 

@@ -1,5 +1,5 @@
 /**
- * skills.js - Skills board + Skill authoring form.
+ * skills.js - Skills board (U5) + Skill authoring form (v4, UI-SPEC §8c item 4).
  *
  * Grid of cards from `skill list --json`, with reliability bars,
  * sparklines from timeline buffer, click-to-modal with `skill show`.
@@ -8,7 +8,7 @@
  * tags, command, timeout_s, success kind) → live manifest JSON preview →
  * stage_manifest → skill lint / skill add.
  *
- * Skill detail modal: human-first layout - What it does,
+ * Skill detail modal: human-first layout per UI-SPEC §9.2 - What it does,
  * How it runs, Track record, Issues, Lineage, collapsed raw JSON.
  *
  * Iron rule: mutations only via soma CLI, exact command shown before running.
@@ -331,7 +331,7 @@ function renderGrid() {
 
     const newBtn = el('button', { cls: 'btn btn-green empty-state-action', text: '+ New skill' });
     newBtn.addEventListener('click', () => {
-      const details = document.querySelector('.cron-add-details');
+      const details = /** @type {HTMLDetailsElement|null} */ (document.querySelector('.cron-add-details'));
       if (details) details.open = true;
     });
     actions.appendChild(newBtn);
@@ -457,7 +457,7 @@ function metricSpan(text) {
  * @param {object} skill - from skill list
  */
 async function openSkillModal(skill) {
-  const modal = document.getElementById('skill-modal');
+  const modal = /** @type {HTMLDialogElement|null} */ (document.getElementById('skill-modal'));
   const content = document.getElementById('skill-modal-content');
   if (!modal || !content) return;
 
@@ -496,7 +496,7 @@ async function openSkillModal(skill) {
 }
 
 /**
- * Render the human-first skill detail modal
+ * Render the human-first skill detail modal per UI-SPEC §9.2.
  * Each section is wrapped in try/catch - bad data renders as dim '-'.
  *
  * @param {HTMLElement} content  - modal content container

@@ -70,7 +70,7 @@ export function openWizard() {
   _step = 1;
   _data = { dir: '', name: '', withBuiltins: true, preset: '' };
   _probeResults = [];
-  const dialog = document.getElementById('wizard-dialog');
+  const dialog = /** @type {HTMLDialogElement|null} */ (document.getElementById('wizard-dialog'));
   if (dialog) {
     renderWizard();
     dialog.showModal();
@@ -81,7 +81,7 @@ export function openWizard() {
  * Close the wizard dialog.
  */
 export function closeWizard() {
-  const dialog = document.getElementById('wizard-dialog');
+  const dialog = /** @type {HTMLDialogElement|null} */ (document.getElementById('wizard-dialog'));
   if (dialog) dialog.close();
 }
 
@@ -146,7 +146,7 @@ function renderStep1(body, footer) {
         dirInput.value = _data.dir;
         if (!_data.name) {
           _data.name = _data.dir.split('/').filter(Boolean).pop() || '';
-          const nameInput = document.getElementById('wizard-name-input');
+          const nameInput = /** @type {HTMLInputElement|null} */ (document.getElementById('wizard-name-input'));
           if (nameInput) nameInput.value = _data.name;
         }
         updateStep1Preview();

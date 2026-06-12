@@ -1,5 +1,5 @@
 /**
- * sessions.js - Conductor board (v3).
+ * sessions.js - Conductor board (v3, UI-SPEC §8b).
  *
  * akmon sessions as first-class objects: "soma decided → akmon executed →
  * evidence captured." Cards come from the host's read-only scan of
@@ -93,7 +93,7 @@ function renderCards() {
     empty.appendChild(el('div', { text: 'Delegate a task to akmon below - it will run, produce evidence, and appear here.' }));
     const focusBtn = el('button', { cls: 'btn empty-state-action', text: 'Delegate a task' });
     focusBtn.addEventListener('click', () => {
-      const inp = document.querySelector('.delegate-input');
+      const inp = /** @type {HTMLInputElement|null} */ (document.querySelector('.delegate-input'));
       if (inp) inp.focus();
     });
     empty.appendChild(focusBtn);

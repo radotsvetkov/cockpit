@@ -1,0 +1,12 @@
+{
+  "name": "soma-cockpit",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Type checking for the soma cockpit UI. The shipped frontend has no runtime dependencies and no build step; the plain ES modules run directly in the webview. TypeScript here is a dev-only checker over JSDoc-annotated JavaScript, never bundled and never shipped.",
+  "scripts": {
+    "typecheck": "tsc -p jsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

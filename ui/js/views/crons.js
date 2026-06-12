@@ -1,5 +1,5 @@
 /**
- * crons.js - Crons board + cron composer.
+ * crons.js - Crons board (v2, UI-SPEC §8a) + cron composer (v4, §8c item 1).
  *
  * Table from `cron list --json`: name, schedule (mono), action kind/target,
  * enabled toggle, next run (relative + absolute), last outcome from buffer.
@@ -75,7 +75,7 @@ function renderShell() {
   header.appendChild(el('h2', { cls: 'section-title', text: 'Crons' }));
   header.appendChild(helpButton('Crons', [
     'Crons are scheduled actions - skills, goals, or shell commands - that run automatically on a 5-field UTC cron schedule. Each run is policy-gated and journaled as a cron.run event.',
-    'Ticks fire only when something calls soma tick. The recommended setup is a launchd LaunchAgent (macOS) or a cron entry (Linux) that runs soma tick on a regular interval.',
+    'Ticks fire only when something calls soma tick. The recommended setup is the included launchagent (scripts/install-launchagent.sh), which calls soma tick on a regular interval.',
     'Add a schedule with the + Add cron form below, then enable it with the toggle. Run tick now forces an immediate tick so you can verify the cron works before its next scheduled time.',
   ]));
 
@@ -256,7 +256,7 @@ async function handleAddCron(btn) {
     if (result.code === 0) {
       // Reset form and collapse details
       _form = { name: '', schedule: '', kind: 'skill', target: '', input: '' };
-      const details = document.querySelector('.cron-add-details');
+      const details = /** @type {HTMLDetailsElement|null} */ (document.querySelector('.cron-add-details'));
       if (details) details.open = false;
       await loadCrons();
       triggerPollAndVerify();
@@ -278,10 +278,10 @@ function renderTable() {
 
   if (crons.length === 0) {
     const empty = el('div', { cls: 'empty-state' });
-    empty.appendChild(el('div', { text: 'Add a schedule - ticks fire via a launchd LaunchAgent or cron.' }));
+    empty.appendChild(el('div', { text: 'Add a schedule - ticks fire via the launchagent (scripts/install-launchagent.sh).' }));
     const addBtn = el('button', { cls: 'btn empty-state-action', text: '+ Add a cron' });
     addBtn.addEventListener('click', () => {
-      const details = document.querySelector('.cron-add-details');
+      const details = /** @type {HTMLDetailsElement|null} */ (document.querySelector('.cron-add-details'));
       if (details) { details.open = true; details.scrollIntoView({ behavior: 'smooth' }); }
     });
     empty.appendChild(addBtn);
@@ -312,7 +312,7 @@ function renderTable() {
   // Dim note at bottom
   body.appendChild(el('div', {
     cls: 'crons-note dim',
-    text: 'ticks fire only when something calls soma tick - set up a launchd LaunchAgent or cron to run it',
+    text: 'ticks fire only when something calls soma tick - see scripts/install-launchagent.sh',
   }));
 }
 

@@ -19,7 +19,8 @@ function box() {
 window.addEventListener(
   'error',
   (e) => {
-    const t = e.target && e.target.src ? ` [load failed: ${e.target.src}]` : '';
+    const tgt = /** @type {{src?: string}|null} */ (e.target);
+    const t = tgt && tgt.src ? ` [load failed: ${tgt.src}]` : '';
     box().textContent += `[error] ${e.message || ''}${t} @ ${e.filename || ''}:${e.lineno || ''}\n`;
   },
   true

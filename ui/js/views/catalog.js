@@ -1,5 +1,5 @@
 /**
- * catalog.js - MCP connector catalog for the soma cockpit (v5).
+ * catalog.js - MCP connector catalog for the soma cockpit (v5, UI-SPEC §9.4).
  *
  * Exports:
  *   CONNECTOR_CATALOG  - 8 catalog entries (id, name, desc, why, command, args,

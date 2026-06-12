@@ -124,7 +124,7 @@ function renderSelectExplain(event, d) {
   const sec = el('div', { cls: 'inspector-section' });
   sec.appendChild(el('div', { cls: 'inspector-section-title', text: 'Why - Skill Selection' }));
 
-  // Two shapes exist:
+  // Two shapes exist (UI-SPEC U4 renders the JOURNALED one):
   //  - journal event: chosen=string, score, factors=[...] (winner's), candidates=COUNT
   //  - select --json: candidates=[{name,score,factors}...]
   const candidates = Array.isArray(d.candidates) ? d.candidates.slice() : [];

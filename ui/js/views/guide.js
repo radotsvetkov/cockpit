@@ -1,5 +1,5 @@
 /**
- * guide.js - Guide view (v5).
+ * guide.js - Guide view (v5, UI-SPEC §9.6).
  *
  * Three sections:
  * 1. Getting-started checklist - 6 live-computed rows.

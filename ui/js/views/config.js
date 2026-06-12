@@ -1,5 +1,5 @@
 /**
- * config.js - Config editor (v4).
+ * config.js - Config editor (v4, UI-SPEC §8c item 2).
  *
  * Loads `config get --json` and renders editable rows for routing tiers,
  * ollama_url, max_tokens, and cache knobs.

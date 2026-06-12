@@ -1,5 +1,5 @@
 /**
- * mcp.js - Connectors tab (v5).
+ * mcp.js - Connectors tab (v5, UI-SPEC §9.3, §9.4, §9.7).
  *
  * Renders:
  *   1. Header + "?" help popover (FAQ copy from §9.6 "Why connectors?").
@@ -244,7 +244,7 @@ async function probeMemora(grid) {
 /**
  * Render a single catalog card.
  *
- * @param {CatalogEntry} entry
+ * @param {import('./catalog.js').CatalogEntry} entry
  * @returns {HTMLElement}
  */
 function renderCatalogCard(entry) {

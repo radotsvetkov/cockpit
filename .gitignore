@@ -28,3 +28,7 @@ STATE.md
 REPORT.md
 ACCEPTANCE*.md
 UI-SPEC.md
+
+# Node tooling (dev-only typecheck; never shipped)
+node_modules/
+.claude/

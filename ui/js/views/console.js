@@ -60,7 +60,7 @@ export function mountConsole() {
 
   // Toggle collapse on header click (but not on buttons)
   _header.addEventListener('click', (e) => {
-    if (e.target.tagName === 'BUTTON') return;
+    if (/** @type {HTMLElement} */ (e.target).tagName === 'BUTTON') return;
     _panel.classList.toggle('collapsed');
   });
 

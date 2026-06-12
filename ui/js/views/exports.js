@@ -1,5 +1,5 @@
 /**
- * exports.js - Exports browser (v2).
+ * exports.js - Exports browser (v2, UI-SPEC §8a).
  *
  * Table from listExports(root): name, size (human), mtime (relative).
  * Per-row actions: "Verify" for *.soma-export dirs; dim hint for .akmon files.

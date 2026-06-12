@@ -361,14 +361,14 @@ function exitEditMode() {
 
 /** Read current values from the edit form and return a plain object. */
 function readEditForm() {
-  const autonomyRadio = document.querySelector('input[name="edit-autonomy"]:checked');
+  const autonomyRadio = /** @type {HTMLInputElement|null} */ (document.querySelector('input[name="edit-autonomy"]:checked'));
   const autonomy = autonomyRadio ? autonomyRadio.value : (_policy.autonomy || 'assist');
 
   const readTA = (key) => textToList(
-    (document.getElementById(`edit-${key}`) || { value: '' }).value
+    /** @type {HTMLTextAreaElement|{value:string}} */ (document.getElementById(`edit-${key}`) || { value: '' }).value
   );
-  const netCb = document.getElementById('edit-allow_network');
-  const tmInput = document.getElementById('edit-max_timeout_s');
+  const netCb = /** @type {HTMLInputElement|null} */ (document.getElementById('edit-allow_network'));
+  const tmInput = /** @type {HTMLInputElement|null} */ (document.getElementById('edit-max_timeout_s'));
 
   return {
     autonomy,
@@ -496,7 +496,7 @@ async function applyChanges(changes) {
   const project = get('currentProject');
   if (!project) return;
 
-  const applyBtn = document.getElementById('policy-apply-btn');
+  const applyBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('policy-apply-btn'));
   if (applyBtn) {
     applyBtn.disabled = true;
     applyBtn.textContent = 'Applying…';

@@ -14,7 +14,7 @@
 
 import { somaVersion, projectList, logVerify, somaRaw } from './soma.js';
 import { get, setState, subscribe, persistProject, getPersistedProject } from './state.js';
-import { el } from './render.js';
+import { el, selectById } from './render.js';
 import { mountStatusBar, refreshStatus } from './views/statusbar.js';
 import { mountInspector, closeInspector } from './views/inspector.js';
 import { showToast } from './views/toast.js';
@@ -250,7 +250,7 @@ function wireTrustBadge() {
   }
 
   document.addEventListener('click', (e) => {
-    if (!popover.contains(e.target) && e.target !== badge) {
+    if (!popover.contains(/** @type {Node} */ (e.target)) && e.target !== badge) {
       popover.classList.add('hidden');
     }
   });
@@ -314,8 +314,8 @@ function updateBadgeUI() {
 
 function wireNav() {
   document.getElementById('main-nav').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-view]');
-    if (btn) navigateTo(btn.dataset.view);
+    const btn = /** @type {HTMLElement} */ (e.target).closest('[data-view]');
+    if (btn) navigateTo(/** @type {HTMLElement} */ (btn).dataset.view);
   });
 }
 
@@ -330,7 +330,7 @@ function wireKeyboardShortcuts() {
     if (openDialog) return;
 
     // Skip when focus is in a form element
-    const t = e.target;
+    const t = /** @type {HTMLElement|null} */ (e.target);
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
 
     // Skip modified keys (Cmd, Ctrl, Alt)
@@ -394,14 +394,14 @@ export function navigateTo(view, opts) {
 
 function updateNavActive(view) {
   for (const btn of document.querySelectorAll('.nav-item')) {
-    btn.classList.toggle('active', btn.dataset.view === view);
+    btn.classList.toggle('active', /** @type {HTMLElement} */ (btn).dataset.view === view);
   }
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────
 
 function wireSidebar() {
-  const sel = document.getElementById('project-select');
+  const sel = selectById('project-select');
   sel.addEventListener('change', () => {
     const root = sel.value;
     if (root) switchProject(root);
@@ -417,7 +417,7 @@ function wireSidebar() {
 }
 
 function populateProjectSelect(projects) {
-  const sel = document.getElementById('project-select');
+  const sel = selectById('project-select');
   sel.innerHTML = '';
   if (!projects || projects.length === 0) {
     sel.appendChild(el('option', { value: '', text: '(no projects)' }));
@@ -431,7 +431,7 @@ function populateProjectSelect(projects) {
 }
 
 function updateProjectSelectUI(root) {
-  const sel = document.getElementById('project-select');
+  const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById('project-select'));
   if (sel) sel.value = root;
 }
 
@@ -465,9 +465,8 @@ function showSetupHint(errMsg) {
   hint.appendChild(el('p', { text: `Error: ${errMsg}` }));
   hint.appendChild(el('p', { text: 'The cockpit looks for the soma binary in this order:' }));
   hint.appendChild(el('code', { text: '1. $SOMA_BIN environment variable' }));
-  hint.appendChild(el('code', { text: '2. the soma binary bundled next to the cockpit (packaged .app)' }));
-  hint.appendChild(el('code', { text: '3. a sibling soma checkout at ../soma/target/release/soma' }));
-  hint.appendChild(el('code', { text: '4. soma on $PATH' }));
+  hint.appendChild(el('code', { text: '2. ../soma/target/release/soma' }));
+  hint.appendChild(el('code', { text: '3. soma on $PATH' }));
   hint.appendChild(el('p', { text: 'Build soma with: cargo build --release --manifest-path ../soma/Cargo.toml' }));
   container.appendChild(hint);
 

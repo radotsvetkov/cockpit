@@ -9,10 +9,11 @@
 /**
  * Create a DOM element with optional attributes, classes, and children.
  *
- * @param {string} tag
+ * @template {string} K
+ * @param {K} tag
  * @param {Object} [attrs={}] - attribute map; 'cls' → className; 'style' → style string; others set as attributes
- * @param {...(Node|string|null|undefined)} children
- * @returns {HTMLElement}
+ * @param {...(Node|string|number|null|undefined)} children
+ * @returns {K extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[K] : HTMLElement}
  */
 export function el(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
@@ -35,7 +36,9 @@ export function el(tag, attrs = {}, ...children) {
       e.appendChild(child);
     }
   }
-  return e;
+  // createElement returns HTMLElement for a generic string tag; re-assert the
+  // tag-specific return type the signature promises.
+  return /** @type {any} */ (e);
 }
 
 /**
@@ -412,6 +415,66 @@ export function fmtBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+// ── Typed element lookups ────────────────────────────────────────
+// These narrow getElementById (which returns HTMLElement|null) to the
+// concrete subtype the call site needs, and throw on a missing node so a
+// stale selector surfaces immediately instead of as a silent null deref.
+
+/**
+ * Look up an <input> by id, throwing if absent.
+ * @param {string} id
+ * @returns {HTMLInputElement}
+ */
+export function inputById(id) {
+  const n = document.getElementById(id);
+  if (!n) throw new Error('missing #' + id);
+  return /** @type {HTMLInputElement} */ (n);
+}
+
+/**
+ * Look up a <select> by id, throwing if absent.
+ * @param {string} id
+ * @returns {HTMLSelectElement}
+ */
+export function selectById(id) {
+  const n = document.getElementById(id);
+  if (!n) throw new Error('missing #' + id);
+  return /** @type {HTMLSelectElement} */ (n);
+}
+
+/**
+ * Look up a <textarea> by id, throwing if absent.
+ * @param {string} id
+ * @returns {HTMLTextAreaElement}
+ */
+export function textareaById(id) {
+  const n = document.getElementById(id);
+  if (!n) throw new Error('missing #' + id);
+  return /** @type {HTMLTextAreaElement} */ (n);
+}
+
+/**
+ * Look up a <dialog> by id, throwing if absent.
+ * @param {string} id
+ * @returns {HTMLDialogElement}
+ */
+export function dialogById(id) {
+  const n = document.getElementById(id);
+  if (!n) throw new Error('missing #' + id);
+  return /** @type {HTMLDialogElement} */ (n);
+}
+
+/**
+ * Look up a <button> by id, throwing if absent.
+ * @param {string} id
+ * @returns {HTMLButtonElement}
+ */
+export function buttonById(id) {
+  const n = document.getElementById(id);
+  if (!n) throw new Error('missing #' + id);
+  return /** @type {HTMLButtonElement} */ (n);
 }
 
 // ── v5 helpers ───────────────────────────────────────────────────

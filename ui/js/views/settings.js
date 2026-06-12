@@ -1,5 +1,5 @@
 /**
- * settings.js - Settings hub (v5).
+ * settings.js - Settings hub (v5, UI-SPEC §9.1 + §9.5).
  *
  * Tabs: Models · Connectors · Ecosystem · Profiles
  * Each tab mounts the corresponding existing module into a tab-panel div.
@@ -115,7 +115,7 @@ async function switchTab(tabId, prefill) {
   const tabBar = document.getElementById('settings-tab-bar');
   if (tabBar) {
     for (const btn of tabBar.querySelectorAll('.settings-tab')) {
-      btn.classList.toggle('active', btn.dataset.tab === tabId);
+      btn.classList.toggle('active', /** @type {HTMLElement} */ (btn).dataset.tab === tabId);
     }
   }
 

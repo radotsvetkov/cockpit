@@ -74,7 +74,7 @@ async function poll() {
     const result = await tail(project, offset);
 
     // mtime changes on in-place edits too (same size) - that's tampering,
-    // so it must re-verify even when no new lines arrive.
+    // so it must re-verify even when no new lines arrive (UI-SPEC §6).
     const mtimeChanged = typeof result.mtime === 'number' && result.mtime !== _lastMtime;
     if (typeof result.mtime === 'number') _lastMtime = result.mtime;
 
@@ -278,7 +278,7 @@ function highlightSelected() {
 }
 
 function updateFollowBtn() {
-  const check = document.getElementById('follow-toggle');
+  const check = /** @type {HTMLInputElement|null} */ (document.getElementById('follow-toggle'));
   if (check) check.checked = get('followMode');
 }
 

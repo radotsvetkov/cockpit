@@ -1,5 +1,5 @@
 /**
- * goals.js - Goals board (v2).
+ * goals.js - Goals board (v2, UI-SPEC §8a).
  *
  * Cards from `goal list --json`: title, why (dim), acceptance list, step list
  * (name + kind chip + last-run status dot from timeline buffer).
