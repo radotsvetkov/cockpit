@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "soma cockpit main window: core IPC only - custom commands carry the allowlist",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

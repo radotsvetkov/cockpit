@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+  <title>soma cockpit</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+  <!-- ─── HEADER ─────────────────────────────────────────────────── -->
+  <header id="app-header">
+    <span class="app-title">soma cockpit</span>
+    <button id="trust-badge" class="trust-badge trust-unknown" aria-label="Verification status">
+      <span class="badge-icon">⛓</span>
+      <span id="badge-text">checking…</span>
+    </button>
+    <!-- Trust detail popover -->
+    <div id="trust-popover" class="popover hidden" role="dialog" aria-modal="true">
+      <div class="popover-header">
+        <span>Chain verification</span>
+        <button id="trust-popover-close" class="btn-icon" aria-label="Close">✕</button>
+      </div>
+      <div id="trust-popover-body" class="popover-body">
+        <p class="dim">Verifying…</p>
+      </div>
+      <div class="popover-footer">
+        <p class="mono dim">verify without soma:</p>
+        <p class="mono dim">sha256sum .soma/events.jsonl</p>
+        <p class="dim">Compare with head hash above. Each event's <code>hash</code> field is SHA-256 of prev+content.</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── LAYOUT WRAPPER ──────────────────────────────────────────── -->
+  <div id="layout">
+
+    <!-- ─── SIDEBAR ───────────────────────────────────────────────── -->
+    <aside id="sidebar">
+      <div class="sidebar-top">
+        <label class="sidebar-label" for="project-select">Project</label>
+        <select id="project-select" class="project-select" aria-label="Select project"></select>
+        <button id="add-project-btn" class="btn-sm" title="Add new project">+ New</button>
+      </div>
+      <nav id="main-nav" aria-label="Views">
+        <span class="nav-group-label">Observe</span>
+        <button class="nav-item active" data-view="timeline">
+          <span class="nav-icon">◎</span> Timeline
+        </button>
+        <button class="nav-item" data-view="sessions">
+          <span class="nav-icon">⟐</span> Sessions
+        </button>
+        <button class="nav-item" data-view="exports">
+          <span class="nav-icon">⬡</span> Evidence
+        </button>
+        <span class="nav-group-label">Operate</span>
+        <button class="nav-item" data-view="skills">
+          <span class="nav-icon">⚙</span> Skills
+        </button>
+        <button class="nav-item" data-view="goals">
+          <span class="nav-icon">◈</span> Goals
+        </button>
+        <button class="nav-item" data-view="crons">
+          <span class="nav-icon">⏱</span> Crons
+        </button>
+        <button class="nav-item" data-view="proposals">
+          <span class="nav-icon">✦</span> Inbox
+          <span id="proposals-badge" class="count-badge hidden">0</span>
+        </button>
+        <span class="nav-group-label">Govern</span>
+        <button class="nav-item" data-view="policy">
+          <span class="nav-icon">⚖</span> Policy
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="nav-icon">⛭</span> Settings
+        </button>
+        <span class="nav-group-label">Learn</span>
+        <button class="nav-item" data-view="guide">
+          <span class="nav-icon">?</span> Guide
+        </button>
+      </nav>
+    </aside>
+
+    <!-- ─── MAIN CONTENT ──────────────────────────────────────────── -->
+    <main id="main-content">
+      <!-- Views are rendered here by JS -->
+      <div id="view-container"></div>
+    </main>
+
+    <!-- ─── INSPECTOR DRAWER ──────────────────────────────────────── -->
+    <aside id="inspector-drawer" class="drawer closed" aria-label="Event inspector">
+      <div class="drawer-header">
+        <div id="drawer-title" class="drawer-title">Inspector</div>
+        <button id="drawer-close" class="btn-icon" aria-label="Close inspector">✕</button>
+      </div>
+      <div id="drawer-content" class="drawer-content"></div>
+    </aside>
+
+  </div>
+
+  <!-- ─── RUN CONSOLE REGION ──────────────────────────────────── -->
+  <div id="console-region"></div>
+
+  <!-- ─── FOOTER STATUS STRIP ───────────────────────────────────── -->
+  <footer id="status-strip">
+    <div id="status-content" class="status-content">
+      <span class="dim">Loading…</span>
+    </div>
+    <button id="status-refresh" class="btn-icon" title="Refresh status" aria-label="Refresh status">↻</button>
+  </footer>
+
+  <!-- ─── TOAST REGION ──────────────────────────────────────────── -->
+  <div id="toast-region" aria-live="polite" aria-label="Notifications"></div>
+
+  <!-- ─── WIZARD DIALOG ─────────────────────────────────────────── -->
+  <dialog id="wizard-dialog" class="wizard-dialog" aria-label="New project wizard">
+    <div id="wizard-content" class="wizard-content"></div>
+  </dialog>
+
+  <!-- ─── SKILL DETAIL MODAL ────────────────────────────────────── -->
+  <dialog id="skill-modal" class="skill-modal" aria-label="Skill details">
+    <div id="skill-modal-content" class="modal-content"></div>
+  </dialog>
+
+  <!-- Entry point: module scripts only, no inline script bodies (CSP).
+       errortrap loads in its own graph so it survives app.js failures. -->
+  <script type="module" src="js/errortrap.js"></script>
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>
