@@ -1,5 +1,7 @@
 # soma cockpit: a local-first desktop app for AI agent governance and audit
 
+[![typecheck](https://github.com/radotsvetkov/cockpit/actions/workflows/typecheck.yml/badge.svg)](https://github.com/radotsvetkov/cockpit/actions/workflows/typecheck.yml)
+
 soma cockpit is a desktop app that turns a soma project into a readable evidence cockpit. It is the window onto everything a governed AI agent did: the timeline of journaled actions, the evidence bundles and RFC 3161 anchors that make the record tamper-evident, the wrapped agent sessions, and the policy that decides what an agent is allowed to do. It runs on your machine, reads your project's files directly, and makes no network calls.
 
 If you are an enterprise software architect or part of a team adopting AI agents, the cockpit is where you observe, operate, and govern those agents without trusting a vendor cloud. It pairs with the [soma runtime](https://github.com/radotsvetkov/soma), which is the enforcer that gates and records every action.
