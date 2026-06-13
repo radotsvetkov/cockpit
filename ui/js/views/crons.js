@@ -17,14 +17,9 @@ import { get, setState } from '../state.js';
 import { cronList, skillList, somaRaw } from '../soma.js';
 import { showToast } from './toast.js';
 import { isRunning, startRun } from './console.js';
+import { formModal, field } from './modal.js';
 
 let _mounted = false;
-
-/**
- * Add-cron form state.
- * @type {{ name:string, schedule:string, kind:string, target:string, input:string }}
- */
-let _form = { name: '', schedule: '', kind: 'skill', target: '', input: '' };
 
 /** @type {string[]} skill names for the target <select> */
 let _skillNames = [];
@@ -34,7 +29,7 @@ let _skillNames = [];
  */
 export async function mountCrons() {
   _mounted = true;
-  _form = { name: '', schedule: '', kind: 'skill', target: '', input: '' };
+  _skillNames = [];
   renderShell();
   // Load skills list (for the target select) and cron list concurrently.
   const project = get('currentProject');
@@ -43,7 +38,6 @@ export async function mountCrons() {
     project ? skillList(project).catch(() => []) : Promise.resolve([]),
   ]);
   _skillNames = ((skills.status === 'fulfilled' && skills.value) || []).map(s => s.name || s).filter(Boolean);
-  if (_mounted) renderAddForm();
 }
 
 /**
@@ -87,186 +81,131 @@ function renderShell() {
   const refreshBtn = el('button', { cls: 'btn', text: '↻ Refresh' });
   refreshBtn.addEventListener('click', () => loadCrons());
 
+  const newBtn = el('button', { cls: 'btn', text: '+ New cron' });
+  newBtn.addEventListener('click', () => openNewCronModal());
+
+  btns.appendChild(newBtn);
   btns.appendChild(tickBtn);
   btns.appendChild(refreshBtn);
   header.appendChild(btns);
   container.appendChild(header);
 
-  // Add-cron form placeholder (populated after skills load)
-  container.appendChild(el('div', { id: 'cron-add-form' }));
-
   container.appendChild(el('div', { id: 'crons-body' }));
 }
 
-// ── Add-cron form ────────────────────────────────────────────────────
+// ── New-cron modal ───────────────────────────────────────────────────
 
-function renderAddForm() {
-  const formEl = document.getElementById('cron-add-form');
-  if (!formEl) return;
-  formEl.innerHTML = '';
+/**
+ * Quote a value for the command preview if it contains spaces or is empty.
+ * Display-only - the real argv is passed unquoted to somaRaw.
+ * @param {string} s
+ * @returns {string}
+ */
+function q(s) {
+  if (s === '' || /[\s"';]/.test(s)) return `"${s}"`;
+  return s;
+}
 
-  const section = el('div', { cls: 'cron-add-section' });
+/**
+ * Open the "+ New cron" modal.
+ * Fields: name, schedule, kind (skill/goal/command), target, optional input.
+ * Target is a <select> of skills when kind=skill and skills are known.
+ * Runs: soma cron add <name> "<sched>" --kind K --target T [--input I]
+ */
+function openNewCronModal() {
+  const project = get('currentProject');
 
-  // Collapsible details element
-  const details = el('details', { cls: 'cron-add-details' });
-  const summary = el('summary', { cls: 'cron-add-summary', text: '+ Add cron' });
-  details.appendChild(summary);
+  const nameInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'my-daily-cron' }));
+  const schedInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: '0 3 * * *' }));
 
-  const body = el('div', { cls: 'cron-add-body' });
-
-  // ── Name ──
-  const nameField = el('div', { cls: 'wizard-field' });
-  nameField.appendChild(el('label', { text: 'Name' }));
-  const nameInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: 'my-daily-cron', value: _form.name });
-  nameInput.addEventListener('input', () => { _form.name = nameInput.value.trim(); updatePreview(); });
-  nameField.appendChild(nameInput);
-  body.appendChild(nameField);
-
-  // ── Schedule ──
-  const schedField = el('div', { cls: 'wizard-field' });
-  schedField.appendChild(el('label', { text: 'Schedule' }));
-  const schedInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: '0 3 * * *', value: _form.schedule });
-  schedInput.addEventListener('input', () => { _form.schedule = schedInput.value.trim(); updatePreview(); });
-  const schedHint = el('div', { cls: 'field-hint dim', text: '5-field cron, UTC' });
-  schedField.appendChild(schedInput);
-  schedField.appendChild(schedHint);
-  body.appendChild(schedField);
-
-  // ── Action kind ──
-  const kindField = el('div', { cls: 'wizard-field' });
-  kindField.appendChild(el('label', { text: 'Action kind' }));
-  const kindSelect = el('select', { cls: 'cron-add-input' });
+  const kindSelect = /** @type {HTMLSelectElement} */ (el('select'));
   for (const k of ['skill', 'goal', 'command']) {
-    const opt = el('option', { value: k, text: k });
-    if (k === _form.kind) opt.selected = true;
-    kindSelect.appendChild(opt);
+    kindSelect.appendChild(el('option', { value: k, text: k }));
   }
 
-  // ── Target (rendered separately, depends on kind) ──
-  const targetField = el('div', { cls: 'wizard-field', id: 'cron-target-field' });
+  // Target field holds either a <select> (skills) or a free <input>.
+  const targetField = el('div', { cls: 'wizard-field' });
   targetField.appendChild(el('label', { text: 'Target' }));
 
-  const renderTargetInput = () => {
-    // Remove existing input/select inside targetField (keep label)
+  /** @returns {string} the current target value */
+  function targetValue() {
+    const ctrl = /** @type {HTMLInputElement|HTMLSelectElement|null} */ (targetField.querySelector('.cron-target-input'));
+    return ctrl ? ctrl.value.trim() : '';
+  }
+
+  /** Rebuild the target control for the current kind (preserving value). */
+  function renderTargetInput() {
+    const prev = targetValue();
     const existing = targetField.querySelector('.cron-target-input');
     if (existing) existing.remove();
 
-    let targetInput;
-    if (_form.kind === 'skill' && _skillNames.length > 0) {
-      targetInput = el('select', { cls: 'cron-add-input cron-target-input' });
-      // blank option
-      const blank = el('option', { value: '', text: '- select skill -' });
-      if (!_form.target) blank.selected = true;
-      targetInput.appendChild(blank);
+    /** @type {HTMLInputElement|HTMLSelectElement} */
+    let ctrl;
+    if (kindSelect.value === 'skill' && _skillNames.length > 0) {
+      ctrl = /** @type {HTMLSelectElement} */ (el('select', { cls: 'cron-target-input' }));
+      ctrl.appendChild(el('option', { value: '', text: '- select skill -' }));
       for (const name of _skillNames) {
         const opt = el('option', { value: name, text: name });
-        if (name === _form.target) opt.selected = true;
-        targetInput.appendChild(opt);
+        if (name === prev) opt.selected = true;
+        ctrl.appendChild(opt);
       }
     } else {
-      targetInput = el('input', { type: 'text', cls: 'cron-add-input cron-target-input', placeholder: _form.kind === 'skill' ? 'skill-name' : _form.kind === 'goal' ? 'goal-id' : 'shell command', value: _form.target });
+      const ph = kindSelect.value === 'skill' ? 'skill-name' : kindSelect.value === 'goal' ? 'goal-id' : 'shell command';
+      ctrl = /** @type {HTMLInputElement} */ (el('input', { type: 'text', cls: 'cron-target-input', placeholder: ph, value: prev }));
     }
-    targetInput.addEventListener('input', () => { _form.target = targetInput.value.trim(); updatePreview(); });
-    targetInput.addEventListener('change', () => { _form.target = targetInput.value.trim(); updatePreview(); });
-    targetField.appendChild(targetInput);
-  };
-
-  kindSelect.addEventListener('change', () => {
-    _form.kind = kindSelect.value;
-    _form.target = '';
-    renderTargetInput();
-    updatePreview();
-  });
-  kindField.appendChild(kindSelect);
-  body.appendChild(kindField);
-
-  renderTargetInput();
-  body.appendChild(targetField);
-
-  // ── Optional input ──
-  const inputField = el('div', { cls: 'wizard-field' });
-  inputField.appendChild(el('label', { text: 'Input (optional)' }));
-  const inputInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: 'passed as --input', value: _form.input });
-  inputInput.addEventListener('input', () => { _form.input = inputInput.value.trim(); updatePreview(); });
-  inputField.appendChild(inputInput);
-  body.appendChild(inputField);
-
-  // ── Live command preview ──
-  const previewEl = el('div', { cls: 'wizard-cmd-preview', id: 'cron-add-preview' });
-  body.appendChild(previewEl);
-
-  // ── Add button ──
-  const addBtn = el('button', { cls: 'btn btn-green', text: '+ Add cron' });
-  addBtn.addEventListener('click', () => handleAddCron(addBtn));
-  body.appendChild(addBtn);
-
-  details.appendChild(body);
-  section.appendChild(details);
-  formEl.appendChild(section);
-
-  updatePreview();
-
-  function updatePreview() {
-    const el2 = document.getElementById('cron-add-preview');
-    if (el2) el2.textContent = buildCronAddPreview();
+    targetField.appendChild(ctrl);
   }
-}
+  renderTargetInput();
 
-/**
- * Build the exact soma command string for the preview.
- * @returns {string}
- */
-function buildCronAddPreview() {
-  const { name, schedule, kind, target, input } = _form;
-  const namePart     = name     || '<name>';
-  const schedPart    = schedule ? `"${schedule}"` : '"<schedule>"';
-  const targetPart   = target   || '<target>';
-  const inputPart    = input    ? ` --input ${input}` : '';
-  return `soma cron add ${namePart} ${schedPart} --kind ${kind} --target ${targetPart}${inputPart}`;
-}
+  const inputInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'passed as --input' }));
 
-/**
- * Build the soma argv array for `cron add`.
- * @returns {string[]}
- */
-function buildCronAddArgs() {
-  const { name, schedule, kind, target, input } = _form;
-  const args = ['cron', 'add', name, schedule, '--kind', kind, '--target', target];
-  if (input) { args.push('--input', input); }
-  return args;
-}
+  const modal = formModal({
+    title: 'New cron',
+    fields: [
+      field('Name', nameInput),
+      field('Schedule', schedInput, '5-field cron, UTC'),
+      field('Action kind', kindSelect),
+      targetField,
+      field('Input (optional)', inputInput),
+    ],
+    commandPreview: () => {
+      const name = nameInput.value.trim() || '<name>';
+      const sched = schedInput.value.trim();
+      const target = targetValue() || '<target>';
+      const input = inputInput.value.trim();
+      let cmd = `soma cron add ${q(name)} ${sched ? q(sched) : '"<schedule>"'} --kind ${kindSelect.value} --target ${q(target)}`;
+      if (input) cmd += ` --input ${q(input)}`;
+      return cmd;
+    },
+    confirmLabel: '+ Add cron',
+    onConfirm: async () => {
+      const name = nameInput.value.trim();
+      const sched = schedInput.value.trim();
+      const target = targetValue();
+      const input = inputInput.value.trim();
+      if (!name) { showToast('Name is required.', 'error'); return false; }
+      if (!sched) { showToast('Schedule is required.', 'error'); return false; }
+      if (!target) { showToast('Target is required.', 'error'); return false; }
 
-async function handleAddCron(btn) {
-  const { name, schedule, kind, target } = _form;
-  if (!name)     { showToast('Name is required.', 'error'); return; }
-  if (!schedule) { showToast('Schedule is required.', 'error'); return; }
-  if (!target)   { showToast('Target is required.', 'error'); return; }
+      const args = ['cron', 'add', name, sched, '--kind', kindSelect.value, '--target', target];
+      if (input) args.push('--input', input);
 
-  const project = get('currentProject');
-  btn.disabled = true;
-  const origText = btn.textContent;
-  btn.textContent = '…';
+      const result = await somaRaw(args, project);
+      const msg = result.stdout.trim() || result.stderr.trim() || `exit ${result.code}`;
+      showToast(msg, result.code === 0 ? 'success' : 'error');
+      if (result.code !== 0) return false;
 
-  try {
-    const args = buildCronAddArgs();
-    const result = await somaRaw(args, project);
-    const msg = result.stdout.trim() || result.stderr.trim() || `exit ${result.code}`;
-    showToast(msg, result.code === 0 ? 'success' : 'error');
-
-    if (result.code === 0) {
-      // Reset form and collapse details
-      _form = { name: '', schedule: '', kind: 'skill', target: '', input: '' };
-      const details = /** @type {HTMLDetailsElement|null} */ (document.querySelector('.cron-add-details'));
-      if (details) details.open = false;
       await loadCrons();
       triggerPollAndVerify();
-    }
-  } catch (e) {
-    showToast(String(e), 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = origText;
-  }
+      return true;
+    },
+  });
+
+  // When the kind changes, rebuild the target control and refresh the preview.
+  kindSelect.addEventListener('change', () => {
+    renderTargetInput();
+    modal.refreshPreview();
+  });
 }
 
 function renderTable() {
@@ -280,10 +219,7 @@ function renderTable() {
     const empty = el('div', { cls: 'empty-state' });
     empty.appendChild(el('div', { text: 'Add a schedule - ticks fire via the launchagent (scripts/install-launchagent.sh).' }));
     const addBtn = el('button', { cls: 'btn empty-state-action', text: '+ Add a cron' });
-    addBtn.addEventListener('click', () => {
-      const details = /** @type {HTMLDetailsElement|null} */ (document.querySelector('.cron-add-details'));
-      if (details) { details.open = true; details.scrollIntoView({ behavior: 'smooth' }); }
-    });
+    addBtn.addEventListener('click', () => openNewCronModal());
     empty.appendChild(addBtn);
     body.appendChild(empty);
     return;

@@ -10,9 +10,10 @@
 
 import { el, fmtTime, helpButton, cmdPreview } from '../render.js';
 import { get, setState } from '../state.js';
-import { goalList } from '../soma.js';
+import { goalList, skillList, somaRaw } from '../soma.js';
 import { showToast } from './toast.js';
 import { isRunning, startRun } from './console.js';
+import { formModal, field } from './modal.js';
 
 let _mounted = false;
 
@@ -60,6 +61,11 @@ function renderShell() {
   const refreshBtn = el('button', { cls: 'btn', text: '↻ Refresh' });
   refreshBtn.addEventListener('click', () => loadGoals());
   header.appendChild(refreshBtn);
+
+  const newBtn = el('button', { cls: 'btn btn-green', text: '+ New goal' });
+  newBtn.addEventListener('click', () => openNewGoalModal());
+  header.appendChild(newBtn);
+
   container.appendChild(header);
 
   container.appendChild(el('div', { id: 'goals-grid', cls: 'goals-grid' }));
@@ -73,8 +79,11 @@ function renderCards() {
   const goals = get('goals') || [];
   if (goals.length === 0) {
     const empty = el('div', { cls: 'empty-state' });
-    empty.appendChild(el('div', { text: 'No goals yet - add one from your terminal:' }));
+    empty.appendChild(el('div', { text: 'No goals yet. Create one - every step is shown as an exact soma command before it runs.' }));
     empty.appendChild(cmdPreview('soma goal add "<title>"'));
+    const newBtn = el('button', { cls: 'btn btn-green empty-state-action', text: '+ New goal' });
+    newBtn.addEventListener('click', () => openNewGoalModal());
+    empty.appendChild(newBtn);
     grid.appendChild(empty);
     return;
   }
@@ -133,10 +142,18 @@ function renderGoalCard(goal) {
     card.appendChild(stepsSection);
   }
 
-  // Run button
+  // Footer: Add step + Run goal
   const footer = el('div', { cls: 'goal-card-footer' });
-  const runBtn = el('button', { cls: 'btn btn-green', text: '▶ Run goal' });
   const goalId = goal.id;
+
+  const addStepBtn = el('button', { cls: 'btn', text: '+ Add step' });
+  addStepBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openAddStepModal(goal);
+  });
+  footer.appendChild(addStepBtn);
+
+  const runBtn = el('button', { cls: 'btn btn-green', text: '▶ Run goal' });
   runBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     handleRunGoal(goalId, runBtn);
@@ -216,6 +233,185 @@ async function handleRunGoal(goalId, runBtn) {
 
   if (code !== -1) {
     runBtn.disabled = false;
+  }
+}
+
+// ── New-goal / add-step modals ───────────────────────────────────
+
+/**
+ * Quote a value for the command preview if it contains spaces or is empty.
+ * Display-only - the real argv is passed unquoted to somaRaw.
+ * @param {string} s
+ * @returns {string}
+ */
+function q(s) {
+  if (s === '' || /[\s"';]/.test(s)) return `"${s}"`;
+  return s;
+}
+
+/**
+ * Open the "+ New goal" modal.
+ * Fields: title, why, acceptance (one per line → joined with ';').
+ * Runs: soma goal add "<title>" --why "..." --accept "a;b"
+ */
+function openNewGoalModal() {
+  const project = get('currentProject');
+
+  const titleInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'Ship the release' }));
+  const whyInput = /** @type {HTMLTextAreaElement} */ (el('textarea', { placeholder: 'Why this goal matters', rows: '2' }));
+  const acceptInput = /** @type {HTMLTextAreaElement} */ (el('textarea', { placeholder: 'tests pass\nchangelog updated', rows: '3' }));
+
+  /** @returns {string} the ';'-joined acceptance string */
+  const acceptJoined = () =>
+    acceptInput.value.split('\n').map(l => l.trim()).filter(Boolean).join(';');
+
+  formModal({
+    title: 'New goal',
+    fields: [
+      field('Title', titleInput),
+      field('Why', whyInput),
+      field('Acceptance criteria', acceptInput, 'one per line'),
+    ],
+    commandPreview: () => {
+      const title = titleInput.value.trim();
+      const why = whyInput.value.trim();
+      const accept = acceptJoined();
+      let cmd = `soma goal add ${q(title || '<title>')}`;
+      if (why) cmd += ` --why ${q(why)}`;
+      if (accept) cmd += ` --accept ${q(accept)}`;
+      return cmd;
+    },
+    confirmLabel: 'Add goal',
+    onConfirm: async () => {
+      const title = titleInput.value.trim();
+      if (!title) { showToast('Title is required.', 'error'); return false; }
+      const why = whyInput.value.trim();
+      const accept = acceptJoined();
+
+      const args = ['goal', 'add', title];
+      if (why) args.push('--why', why);
+      if (accept) args.push('--accept', accept);
+
+      const result = await somaRaw(args, project);
+      const msg = result.stdout.trim() || result.stderr.trim() || `exit ${result.code}`;
+      showToast(msg, result.code === 0 ? 'success' : 'error');
+      if (result.code !== 0) return false;
+
+      await loadGoals();
+      triggerPollAndVerify();
+      return true;
+    },
+  });
+}
+
+/**
+ * Open the "+ Add step" modal for a goal.
+ * Fields: name, kind (command/skill/model), input, skill (when kind=skill),
+ * verify kind (exit0/contains/command), verify value (when not exit0).
+ * Runs: soma goal step <id> --name N --kind K --input I [--skill S] [--verify exit0|contains:X|command:X]
+ *
+ * @param {object} goal - from goal list (needs id + title)
+ */
+function openAddStepModal(goal) {
+  const project = get('currentProject');
+  const goalId = goal.id;
+  if (!goalId) { showToast('Goal has no id.', 'error'); return; }
+
+  const nameInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'build' }));
+
+  const kindSelect = /** @type {HTMLSelectElement} */ (el('select'));
+  for (const k of ['command', 'skill', 'model']) {
+    kindSelect.appendChild(el('option', { value: k, text: k }));
+  }
+
+  const inputInput = /** @type {HTMLTextAreaElement} */ (el('textarea', { placeholder: 'cargo build --release', rows: '2' }));
+
+  const skillSelect = /** @type {HTMLSelectElement} */ (el('select'));
+  skillSelect.appendChild(el('option', { value: '', text: '- select skill -' }));
+
+  const verifyKindSelect = /** @type {HTMLSelectElement} */ (el('select'));
+  for (const v of ['exit0', 'contains', 'command']) {
+    verifyKindSelect.appendChild(el('option', { value: v, text: v }));
+  }
+
+  const verifyValueInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'expected output' }));
+
+  const skillField = field('Skill', skillSelect);
+  const verifyValueField = field('Verify value', verifyValueInput);
+
+  /** Show/hide the skill + verify-value fields based on current selections. */
+  function syncVisibility() {
+    skillField.style.display = kindSelect.value === 'skill' ? '' : 'none';
+    verifyValueField.style.display = verifyKindSelect.value === 'exit0' ? 'none' : '';
+  }
+  kindSelect.addEventListener('change', syncVisibility);
+  verifyKindSelect.addEventListener('change', syncVisibility);
+  syncVisibility();
+
+  /** @returns {string|null} the --verify token, or null for plain exit0 */
+  function verifyToken() {
+    const vk = verifyKindSelect.value;
+    if (vk === 'exit0') return null;
+    return `${vk}:${verifyValueInput.value.trim()}`;
+  }
+
+  /** @returns {string[]} the soma argv for this step */
+  function buildArgs() {
+    const args = ['goal', 'step', goalId, '--name', nameInput.value.trim(), '--kind', kindSelect.value, '--input', inputInput.value];
+    if (kindSelect.value === 'skill' && skillSelect.value) args.push('--skill', skillSelect.value);
+    const vt = verifyToken();
+    if (vt !== null) args.push('--verify', vt);
+    return args;
+  }
+
+  const modal = formModal({
+    title: `Add step to ${goal.title || goalId}`,
+    fields: [
+      field('Name', nameInput),
+      field('Kind', kindSelect),
+      field('Input', inputInput),
+      skillField,
+      field('Verify', verifyKindSelect),
+      verifyValueField,
+    ],
+    commandPreview: () => {
+      const name = nameInput.value.trim() || '<name>';
+      const kind = kindSelect.value;
+      const input = inputInput.value;
+      let cmd = `soma goal step ${goalId} --name ${q(name)} --kind ${kind} --input ${q(input)}`;
+      if (kind === 'skill' && skillSelect.value) cmd += ` --skill ${q(skillSelect.value)}`;
+      const vt = verifyToken();
+      if (vt !== null) cmd += ` --verify ${q(vt)}`;
+      return cmd;
+    },
+    confirmLabel: 'Add step',
+    onConfirm: async () => {
+      const name = nameInput.value.trim();
+      if (!name) { showToast('Step name is required.', 'error'); return false; }
+      if (kindSelect.value === 'skill' && !skillSelect.value) {
+        showToast('Select a skill for this step.', 'error');
+        return false;
+      }
+      const result = await somaRaw(buildArgs(), project);
+      const msg = result.stdout.trim() || result.stderr.trim() || `exit ${result.code}`;
+      showToast(msg, result.code === 0 ? 'success' : 'error');
+      if (result.code !== 0) return false;
+
+      await loadGoals();
+      triggerPollAndVerify();
+      return true;
+    },
+  });
+
+  // Populate the skill <select> from the project's skills (async, non-blocking).
+  if (project) {
+    skillList(project).then((skills) => {
+      for (const s of (skills || [])) {
+        const name = s && (s.name || s);
+        if (name) skillSelect.appendChild(el('option', { value: name, text: name }));
+      }
+      modal.refreshPreview();
+    }).catch(() => { /* leave the placeholder option */ });
   }
 }
 

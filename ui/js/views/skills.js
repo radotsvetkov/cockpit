@@ -21,28 +21,15 @@ import { get, subscribe, setState } from '../state.js';
 import { skillList, skillShow, somaJson, somaRaw } from '../soma.js';
 import { showToast } from './toast.js';
 import { isRunning, startRun } from './console.js';
+import { formModal, field } from './modal.js';
 
 let _mounted = false;
-
-// ── New-skill form state ─────────────────────────────────────────
-/** @type {{ name:string, purpose:string, goal:string, tags:string, cmd:string, timeout_s:number, successKind:string, containsText:string }} */
-let _newSkill = {
-  name: '',
-  purpose: '',
-  goal: '',
-  tags: '',
-  cmd: '',
-  timeout_s: 60,
-  successKind: 'exit0',
-  containsText: '',
-};
 
 /**
  * Mount the skills view into #view-container.
  */
 export async function mountSkills() {
   _mounted = true;
-  _newSkill = { name: '', purpose: '', goal: '', tags: '', cmd: '', timeout_s: 60, successKind: 'exit0', containsText: '' };
   renderShell();
 
   // Refresh skill list
@@ -82,6 +69,10 @@ function renderShell() {
   refreshBtn.addEventListener('click', () => loadSkills());
   btns.appendChild(refreshBtn);
 
+  const newBtn = el('button', { cls: 'btn btn-green', text: '+ New skill' });
+  newBtn.addEventListener('click', () => openSkillForm(null));
+  btns.appendChild(newBtn);
+
   // §9.7 help button
   btns.appendChild(helpButton('Skills', [
     'A skill is a single command soma can run, with a success rule and a tracked record. Cards show reliability (Laplace-smoothed) and recent runs. Click a card for the full story; ▶ runs it live in the console.',
@@ -91,226 +82,197 @@ function renderShell() {
   header.appendChild(btns);
   container.appendChild(header);
 
-  // New-skill composer (collapsible, like cron composer)
-  container.appendChild(el('div', { id: 'skill-new-form' }));
-  renderNewSkillForm();
-
   container.appendChild(el('div', { id: 'skills-grid', cls: 'skills-grid' }));
 }
 
-// ── New-skill form ───────────────────────────────────────────────
+// ── New / edit skill modal ───────────────────────────────────────
 
-function renderNewSkillForm() {
-  const formEl = document.getElementById('skill-new-form');
-  if (!formEl) return;
-  formEl.innerHTML = '';
+/**
+ * @typedef {Object} SkillFormState
+ * @property {string} name
+ * @property {string} purpose
+ * @property {string} goal
+ * @property {string} tags
+ * @property {string} cmd
+ * @property {number} timeout_s
+ * @property {string} successKind
+ * @property {string} containsText
+ * @property {number} version
+ */
 
-  const section = el('div', { cls: 'cron-add-section' });
-  const details = el('details', { cls: 'cron-add-details' });
-  const summary = el('summary', { cls: 'cron-add-summary', text: '+ New skill' });
-  details.appendChild(summary);
-
-  const body = el('div', { cls: 'cron-add-body' });
-
-  // ── Name ──
-  const nameField = el('div', { cls: 'wizard-field' });
-  nameField.appendChild(el('label', { text: 'Name' }));
-  const nameInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: 'my-skill', value: _newSkill.name });
-  nameInput.addEventListener('input', () => { _newSkill.name = nameInput.value.trim(); updatePreviews(); });
-  nameField.appendChild(nameInput);
-  body.appendChild(nameField);
-
-  // ── Purpose ──
-  const purposeField = el('div', { cls: 'wizard-field' });
-  purposeField.appendChild(el('label', { text: 'Purpose' }));
-  const purposeInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: 'One-line what/why', value: _newSkill.purpose });
-  purposeInput.addEventListener('input', () => { _newSkill.purpose = purposeInput.value; updatePreviews(); });
-  purposeField.appendChild(purposeInput);
-  body.appendChild(purposeField);
-
-  // ── Goal ──
-  const goalField = el('div', { cls: 'wizard-field' });
-  goalField.appendChild(el('label', { text: 'Goal' }));
-  const goalInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: 'Desired outcome', value: _newSkill.goal });
-  goalInput.addEventListener('input', () => { _newSkill.goal = goalInput.value; updatePreviews(); });
-  goalField.appendChild(goalInput);
-  body.appendChild(goalField);
-
-  // ── Tags ──
-  const tagsField = el('div', { cls: 'wizard-field' });
-  tagsField.appendChild(el('label', { text: 'Tags (comma-separated)' }));
-  const tagsInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: 'rust, test, ci', value: _newSkill.tags });
-  tagsInput.addEventListener('input', () => { _newSkill.tags = tagsInput.value; updatePreviews(); });
-  tagsField.appendChild(tagsInput);
-  body.appendChild(tagsField);
-
-  // ── Command ──
-  const cmdField = el('div', { cls: 'wizard-field' });
-  cmdField.appendChild(el('label', { text: 'Command' }));
-  const cmdInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: 'cargo test --workspace', value: _newSkill.cmd });
-  cmdInput.addEventListener('input', () => { _newSkill.cmd = cmdInput.value; updatePreviews(); });
-  cmdField.appendChild(cmdInput);
-  body.appendChild(cmdField);
-
-  // ── Timeout ──
-  const timeoutField = el('div', { cls: 'wizard-field' });
-  timeoutField.appendChild(el('label', { text: 'Timeout (seconds)' }));
-  const timeoutInput = el('input', { type: 'number', cls: 'cron-add-input', value: String(_newSkill.timeout_s), style: 'max-width:120px' });
-  timeoutInput.min = '1';
-  timeoutInput.addEventListener('input', () => { _newSkill.timeout_s = Math.max(1, parseInt(timeoutInput.value, 10) || 60); updatePreviews(); });
-  timeoutField.appendChild(timeoutInput);
-  body.appendChild(timeoutField);
-
-  // ── Success kind ──
-  const kindField = el('div', { cls: 'wizard-field' });
-  kindField.appendChild(el('label', { text: 'Success kind' }));
-  const kindSelect = el('select', { cls: 'cron-add-input', style: 'max-width:200px' });
-  for (const k of ['exit0', 'contains']) {
-    const opt = el('option', { value: k, text: k });
-    if (k === _newSkill.successKind) opt.selected = true;
-    kindSelect.appendChild(opt);
-  }
-  kindField.appendChild(kindSelect);
-  body.appendChild(kindField);
-
-  // ── Contains-text (shown only when kind=contains) ──
-  const containsField = el('div', { cls: 'wizard-field', id: 'skill-contains-field' });
-  containsField.appendChild(el('label', { text: 'Contains text' }));
-  const containsInput = el('input', { type: 'text', cls: 'cron-add-input', placeholder: 'expected output substring', value: _newSkill.containsText });
-  containsInput.addEventListener('input', () => { _newSkill.containsText = containsInput.value; updatePreviews(); });
-  containsField.appendChild(containsInput);
-  containsField.style.display = _newSkill.successKind === 'contains' ? '' : 'none';
-  body.appendChild(containsField);
-
-  kindSelect.addEventListener('change', () => {
-    _newSkill.successKind = kindSelect.value;
-    containsField.style.display = _newSkill.successKind === 'contains' ? '' : 'none';
-    updatePreviews();
-  });
-
-  // ── Manifest JSON preview ──
-  const manifestLabel = el('div', { cls: 'skill-form-section-label', text: 'Manifest JSON' });
-  body.appendChild(manifestLabel);
-  const manifestPre = el('pre', { cls: 'skill-manifest-preview', id: 'skill-manifest-preview' });
-  body.appendChild(manifestPre);
-
-  // ── Command preview ──
-  const cmdPrevEl = el('div', { cls: 'wizard-cmd-preview', id: 'skill-cmd-preview' });
-  body.appendChild(cmdPrevEl);
-
-  // ── Action buttons ──
-  const btnRow = el('div', { cls: 'skill-form-btns' });
-
-  const lintBtn = el('button', { cls: 'btn', text: 'Lint' });
-  lintBtn.addEventListener('click', () => handleLintSkill(lintBtn));
-
-  const addBtn = el('button', { cls: 'btn btn-green', text: '+ Add skill' });
-  addBtn.addEventListener('click', () => handleAddSkill(addBtn, details));
-
-  btnRow.appendChild(lintBtn);
-  btnRow.appendChild(addBtn);
-  body.appendChild(btnRow);
-
-  details.appendChild(body);
-  section.appendChild(details);
-  formEl.appendChild(section);
-
-  updatePreviews();
-
-  function updatePreviews() {
-    const pre = document.getElementById('skill-manifest-preview');
-    if (pre) pre.textContent = JSON.stringify(buildManifest(), null, 2);
-    const cp = document.getElementById('skill-cmd-preview');
-    if (cp) cp.textContent = 'soma skill add <staged-path>';
-  }
+/**
+ * Derive a SkillFormState from an existing manifest (for Edit), or defaults.
+ * @param {object|null} manifest
+ * @returns {SkillFormState}
+ */
+function stateFromManifest(manifest) {
+  const m = manifest || {};
+  const run = m.run || {};
+  const success = m.success || {};
+  return {
+    name: m.name || '',
+    purpose: m.purpose || '',
+    goal: m.goal || '',
+    tags: Array.isArray(m.tags) ? m.tags.join(', ') : (m.tags || ''),
+    cmd: run.cmd || '',
+    timeout_s: typeof run.timeout_s === 'number' ? run.timeout_s : 60,
+    successKind: success.kind === 'contains' ? 'contains' : 'exit0',
+    containsText: success.kind === 'contains' ? (success.text || '') : '',
+    version: typeof m.version === 'number' ? m.version : 1,
+  };
 }
 
 /**
- * Build the skill manifest object from current form state.
+ * Build a skill manifest object from a SkillFormState.
+ * @param {SkillFormState} s
  * @returns {object}
  */
-function buildManifest() {
-  const { name, purpose, goal, tags, cmd, timeout_s, successKind, containsText } = _newSkill;
-  const tagArr = tags.split(',').map(t => t.trim()).filter(Boolean);
-  const manifest = {
-    name: name || '<name>',
-    version: 1,
-    purpose: purpose || '',
-    goal: goal || '',
+function buildManifest(s) {
+  const tagArr = s.tags.split(',').map(t => t.trim()).filter(Boolean);
+  return {
+    name: s.name || '<name>',
+    version: s.version || 1,
+    purpose: s.purpose || '',
+    goal: s.goal || '',
     tags: tagArr,
     kind: 'command',
-    run: {
-      cmd: cmd || '',
-      timeout_s: timeout_s || 60,
-    },
-    success: successKind === 'contains'
-      ? { kind: 'contains', text: containsText || '' }
+    run: { cmd: s.cmd || '', timeout_s: s.timeout_s || 60 },
+    success: s.successKind === 'contains'
+      ? { kind: 'contains', text: s.containsText || '' }
       : { kind: 'exit0' },
   };
-  return manifest;
 }
 
 /**
- * Stage the manifest and run `soma skill lint <path>`.
- * @param {HTMLButtonElement} btn
+ * Open the shared wizard-styled modal for creating or editing a skill.
+ *
+ * `skill add` overwrites an existing manifest of the same name in place, so
+ * Edit re-stages the manifest and runs `skill add` to save over it (verified
+ * against the CLI - no version bump required). When editing, the name field is
+ * read-only so the overwrite always targets the same skill.
+ *
+ * @param {object|null} existingManifest - manifest to edit, or null to create
  */
-async function handleLintSkill(btn) {
+function openSkillForm(existingManifest) {
   const project = get('currentProject');
-  btn.disabled = true;
-  const origText = btn.textContent;
-  btn.textContent = '…';
+  const isEdit = !!existingManifest;
+  const s = stateFromManifest(existingManifest);
 
-  try {
-    const invoke = window.__TAURI__.core.invoke;
-    const content = JSON.stringify(buildManifest(), null, 2);
-    const path = await invoke('stage_manifest', { content });
-    const result = await somaRaw(['skill', 'lint', path], project);
-    const msg = result.stdout.trim() || result.stderr.trim() || `exit ${result.code}`;
-    showToast(msg, result.code === 0 ? 'success' : 'error');
-  } catch (e) {
-    showToast(String(e), 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = origText;
+  const nameInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'my-skill', value: s.name }));
+  if (isEdit) { nameInput.readOnly = true; nameInput.title = 'Name is fixed when editing.'; }
+
+  const purposeInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'One-line what/why', value: s.purpose }));
+  const goalInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'Desired outcome', value: s.goal }));
+  const tagsInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'rust, test, ci', value: s.tags }));
+  const cmdInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'cargo test --workspace', value: s.cmd }));
+
+  const timeoutInput = /** @type {HTMLInputElement} */ (el('input', { type: 'number', value: String(s.timeout_s) }));
+  timeoutInput.min = '1';
+
+  const kindSelect = /** @type {HTMLSelectElement} */ (el('select'));
+  for (const k of ['exit0', 'contains']) {
+    const opt = el('option', { value: k, text: k });
+    if (k === s.successKind) opt.selected = true;
+    kindSelect.appendChild(opt);
   }
-}
 
-/**
- * Stage the manifest and run `soma skill add <path>`.
- * On success: reset form, collapse details, refresh board.
- * @param {HTMLButtonElement} btn
- * @param {HTMLDetailsElement} details
- */
-async function handleAddSkill(btn, details) {
-  const { name } = _newSkill;
-  if (!name) { showToast('Name is required.', 'error'); return; }
-  if (!_newSkill.cmd) { showToast('Command is required.', 'error'); return; }
+  const containsInput = /** @type {HTMLInputElement} */ (el('input', { type: 'text', placeholder: 'expected output substring', value: s.containsText }));
+  const containsField = field('Contains text', containsInput);
 
-  const project = get('currentProject');
-  btn.disabled = true;
-  const origText = btn.textContent;
-  btn.textContent = '…';
+  function syncVisibility() {
+    containsField.style.display = kindSelect.value === 'contains' ? '' : 'none';
+  }
+  kindSelect.addEventListener('change', syncVisibility);
+  syncVisibility();
 
-  try {
+  /** @returns {SkillFormState} the current form state */
+  function readState() {
+    return {
+      name: nameInput.value.trim(),
+      purpose: purposeInput.value,
+      goal: goalInput.value,
+      tags: tagsInput.value,
+      cmd: cmdInput.value,
+      timeout_s: Math.max(1, parseInt(timeoutInput.value, 10) || 60),
+      successKind: kindSelect.value,
+      containsText: containsInput.value,
+      version: s.version,
+    };
+  }
+
+  // Live manifest JSON preview - collapsed by default so the modal stays the
+  // same compact height as the goal/cron modals (footer reachable without
+  // scrolling). Expand to inspect the exact JSON that will be staged.
+  const manifestPre = el('pre', { cls: 'json-pretty', style: 'margin-top:6px;max-height:200px;overflow:auto' });
+  const manifestField = el('details', { cls: 'raw-json wizard-field' });
+  manifestField.appendChild(el('summary', { text: 'Manifest JSON' }));
+  manifestField.appendChild(manifestPre);
+
+  /** Stage the current manifest and return its path. */
+  async function stage() {
     const invoke = window.__TAURI__.core.invoke;
-    const content = JSON.stringify(buildManifest(), null, 2);
-    const path = await invoke('stage_manifest', { content });
-    const result = await somaRaw(['skill', 'add', path], project);
-    const msg = result.stdout.trim() || result.stderr.trim() || `exit ${result.code}`;
-    showToast(msg, result.code === 0 ? 'success' : 'error');
+    const content = JSON.stringify(buildManifest(readState()), null, 2);
+    return invoke('stage_manifest', { content });
+  }
 
-    if (result.code === 0) {
-      _newSkill = { name: '', purpose: '', goal: '', tags: '', cmd: '', timeout_s: 60, successKind: 'exit0', containsText: '' };
-      if (details) details.open = false;
+  // Lint as a secondary action in the body (kept from the old form).
+  const lintBtn = el('button', { cls: 'btn', text: 'Lint' });
+  lintBtn.addEventListener('click', async () => {
+    lintBtn.disabled = true;
+    const orig = lintBtn.textContent;
+    lintBtn.textContent = '…';
+    try {
+      const path = await stage();
+      const result = await somaRaw(['skill', 'lint', path], project);
+      const msg = result.stdout.trim() || result.stderr.trim() || `exit ${result.code}`;
+      showToast(msg, result.code === 0 ? 'success' : 'error');
+    } catch (e) {
+      showToast(String(e), 'error');
+    } finally {
+      lintBtn.disabled = false;
+      lintBtn.textContent = orig;
+    }
+  });
+  const lintRow = el('div', { cls: 'wizard-field', style: 'margin-bottom:0' });
+  lintRow.appendChild(lintBtn);
+
+  const modal = formModal({
+    title: isEdit ? `Edit skill ${s.name}` : 'New skill',
+    fields: [
+      field('Name', nameInput),
+      field('Purpose', purposeInput),
+      field('Goal', goalInput),
+      field('Tags (comma-separated)', tagsInput),
+      field('Command', cmdInput),
+      field('Timeout (seconds)', timeoutInput),
+      field('Success kind', kindSelect),
+      containsField,
+      manifestField,
+      lintRow,
+    ],
+    commandPreview: () => {
+      // Refresh the manifest JSON preview alongside the command line.
+      manifestPre.textContent = JSON.stringify(buildManifest(readState()), null, 2);
+      return 'soma skill add <staged-manifest>';
+    },
+    confirmLabel: isEdit ? 'Save skill' : '+ Add skill',
+    onConfirm: async () => {
+      const st = readState();
+      if (!st.name) { showToast('Name is required.', 'error'); return false; }
+      if (!st.cmd) { showToast('Command is required.', 'error'); return false; }
+      const path = await stage();
+      const result = await somaRaw(['skill', 'add', path], project);
+      const msg = result.stdout.trim() || result.stderr.trim() || `exit ${result.code}`;
+      showToast(msg, result.code === 0 ? 'success' : 'error');
+      if (result.code !== 0) return false;
       await loadSkills();
       triggerPollAndVerify();
-    }
-  } catch (e) {
-    showToast(String(e), 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = origText;
-  }
+      return true;
+    },
+  });
+
+  // Seed the manifest JSON preview immediately.
+  modal.refreshPreview();
 }
 
 // ── Grid rendering ───────────────────────────────────────────────
@@ -330,10 +292,7 @@ function renderGrid() {
     const actions = el('div', { cls: 'empty-state-actions' });
 
     const newBtn = el('button', { cls: 'btn btn-green empty-state-action', text: '+ New skill' });
-    newBtn.addEventListener('click', () => {
-      const details = /** @type {HTMLDetailsElement|null} */ (document.querySelector('.cron-add-details'));
-      if (details) details.open = true;
-    });
+    newBtn.addEventListener('click', () => openSkillForm(null));
     actions.appendChild(newBtn);
 
     const connBtn = el('button', { cls: 'btn empty-state-action', text: 'Browse connectors' });
@@ -555,6 +514,17 @@ function renderSkillDetail(content, skill, detail, modal) {
         });
       });
       hdrBtns.appendChild(runBtn);
+    }
+
+    // Edit - opens the shared modal pre-filled from this manifest. Saving
+    // re-stages the manifest and runs `skill add` to overwrite in place.
+    if (!skill.archived && !(manifest && manifest.archived)) {
+      const editBtn = el('button', { cls: 'btn btn-sm', text: 'Edit' });
+      editBtn.addEventListener('click', () => {
+        modal.close();
+        openSkillForm(manifest && manifest.name ? manifest : { ...manifest, name: skillName });
+      });
+      hdrBtns.appendChild(editBtn);
     }
 
     const closeBtn = el('button', { cls: 'btn-icon', 'aria-label': 'Close', text: '✕' });
