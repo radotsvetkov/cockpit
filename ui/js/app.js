@@ -99,8 +99,9 @@ export async function boot() {
     populateProjectSelect(projects || []);
 
     if (!projects || projects.length === 0) {
-      // No projects → open wizard
-      openWizard();
+      // No projects → show a first-run empty state offering the one-click demo
+      // or the full wizard. (The wizard is also reachable via "+ New".)
+      showEmptyState();
       return;
     }
 
@@ -453,6 +454,38 @@ async function updateProposalsBadge() {
   } catch (_) {}
 }
 
+// ── First-run empty state ────────────────────────────────────────
+
+/**
+ * Render the no-projects empty state into #view-container with two paths:
+ * a prominent one-click "Load demo project" and the full New-project wizard.
+ */
+function showEmptyState() {
+  const container = document.getElementById('view-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const wrap = el('div', { cls: 'empty-state', style: 'max-width:560px;margin:64px auto 0;text-align:center;' });
+  wrap.appendChild(el('div', { style: 'font-size:34px;margin-bottom:8px;', text: '◎' }));
+  wrap.appendChild(el('h2', { style: 'margin:0 0 6px;', text: 'Welcome to soma cockpit' }));
+  wrap.appendChild(el('p', { cls: 'dim', style: 'margin:0 0 24px;line-height:1.5;', text: 'No projects yet. Load a demo project to see a working cockpit in one click - a timeline, skills, a governed run, a goal, and an evidence bundle, all offline - or create your own.' }));
+
+  const btnRow = el('div', { style: 'display:flex;gap:10px;justify-content:center;' });
+  const demoBtn = el('button', { cls: 'btn btn-green', style: 'font-size:14px;padding:10px 18px;', text: '✨ Load demo project' });
+  demoBtn.addEventListener('click', () => {
+    import('./views/demo.js')
+      .then(m => m.openDemoModal())
+      .catch(err => showToast(`demo: ${err}`, 'error'));
+  });
+  const newBtn = el('button', { cls: 'btn', style: 'font-size:14px;padding:10px 18px;', text: '+ New project' });
+  newBtn.addEventListener('click', () => openWizard());
+  btnRow.appendChild(demoBtn);
+  btnRow.appendChild(newBtn);
+  wrap.appendChild(btnRow);
+
+  container.appendChild(wrap);
+}
+
 // ── Setup hint ───────────────────────────────────────────────────
 
 function showSetupHint(errMsg) {
@@ -465,9 +498,9 @@ function showSetupHint(errMsg) {
   hint.appendChild(el('p', { text: `Error: ${errMsg}` }));
   hint.appendChild(el('p', { text: 'The cockpit looks for the soma binary in this order:' }));
   hint.appendChild(el('code', { text: '1. $SOMA_BIN environment variable' }));
-  hint.appendChild(el('code', { text: '2. ../soma/target/release/soma' }));
+  hint.appendChild(el('code', { text: '2. /Users/radotsvetkov/Desktop/HYT/agent/target/release/soma' }));
   hint.appendChild(el('code', { text: '3. soma on $PATH' }));
-  hint.appendChild(el('p', { text: 'Build soma with: cargo build --release --manifest-path ../soma/Cargo.toml' }));
+  hint.appendChild(el('p', { text: 'Build soma with: cargo build --release --manifest-path ../agent/Cargo.toml' }));
   container.appendChild(hint);
 
   // Still update badge

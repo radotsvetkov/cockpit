@@ -16,6 +16,7 @@ import { el, helpButton } from '../render.js';
 import { get } from '../state.js';
 import { modelProbe, listExports } from '../soma.js';
 import { showToast } from './toast.js';
+import { openDemoModal } from './demo.js';
 
 // ── State ────────────────────────────────────────────────────────
 
@@ -220,6 +221,17 @@ export function mountGuide() {
   const refreshBtn = el('button', { cls: 'btn btn-sm', style: 'margin-left:auto;', text: '↺ Refresh checks' });
   header.appendChild(refreshBtn);
   container.appendChild(header);
+
+  // ── Quick-start: one-click demo project ──
+  const quick = el('section', { cls: 'guide-section', style: 'margin-top:20px;display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:6px;' });
+  const quickText = el('div', { style: 'flex:1;min-width:0;' });
+  quickText.appendChild(el('div', { style: 'font-weight:700;', text: 'New here? Load a demo project' }));
+  quickText.appendChild(el('div', { cls: 'dim', style: 'font-size:12px;margin-top:2px;', text: 'One click scaffolds a populated project - skills, a governed run, a goal, and an evidence bundle - fully offline, so the cockpit is alive instead of empty.' }));
+  quick.appendChild(quickText);
+  const demoBtn = el('button', { cls: 'btn btn-green', style: 'flex:none;', text: '✨ Load demo project' });
+  demoBtn.addEventListener('click', () => openDemoModal());
+  quick.appendChild(demoBtn);
+  container.appendChild(quick);
 
   // ── Section 1: Checklist ──
   const checkSection = el('section', { cls: 'guide-section', style: 'margin-top:20px;' });

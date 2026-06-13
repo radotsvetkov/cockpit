@@ -369,7 +369,7 @@ function openAddStepModal(goal) {
     fields: [
       field('Name', nameInput),
       field('Kind', kindSelect),
-      field('Input', inputInput),
+      field('Input', inputInput, 'Required for command and model steps; optional for skill.'),
       skillField,
       field('Verify', verifyKindSelect),
       verifyValueField,
@@ -390,6 +390,10 @@ function openAddStepModal(goal) {
       if (!name) { showToast('Step name is required.', 'error'); return false; }
       if (kindSelect.value === 'skill' && !skillSelect.value) {
         showToast('Select a skill for this step.', 'error');
+        return false;
+      }
+      if ((kindSelect.value === 'command' || kindSelect.value === 'model') && !inputInput.value.trim()) {
+        showToast('Input is required for command and model steps.', 'error');
         return false;
       }
       const result = await somaRaw(buildArgs(), project);
