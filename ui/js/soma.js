@@ -349,3 +349,21 @@ export async function listAkmonSessions(root) {
   const invoke = getInvoke();
   return invoke('list_akmon_sessions', { root });
 }
+
+/**
+ * @typedef {Object} EcoTool
+ * @property {string} name    - tool name (akmon, agef-verify, memora, memora-cli)
+ * @property {string} path    - detected binary path (env/PATH/default)
+ * @property {boolean} exists  - whether the binary is present + executable
+ * @property {string} version  - `--version` output, or '' when not found
+ */
+
+/**
+ * Probe sibling HYT tools (akmon, agef-verify, memora, memora-cli).
+ * Read-only presence + version; never reads foreign configs.
+ * @returns {Promise<EcoTool[]>}
+ */
+export async function ecosystemInfo() {
+  const invoke = getInvoke();
+  return invoke('ecosystem_info');
+}

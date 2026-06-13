@@ -12,7 +12,7 @@
 
 import { el, fmtTime, helpButton } from '../render.js';
 import { get } from '../state.js';
-import { listAkmonSessions } from '../soma.js';
+import { listAkmonSessions, skillList, ecosystemInfo } from '../soma.js';
 import { showToast } from './toast.js';
 import { isRunning, startRun } from './console.js';
 import { formModal, field } from './modal.js';
@@ -74,7 +74,14 @@ function renderShell() {
     const task = input.value.trim();
     if (!task) { showToast('enter a task to delegate', 'error'); return; }
     if (isRunning()) { showToast('a run is already in progress', 'error'); return; }
+
+    // Graceful gate: don't run a missing/broken skill. Delegation needs the
+    // akmon-task skill installed AND akmon detected. If either is absent, point
+    // the user at Settings → Ecosystem instead of erroring on a missing skill.
     btn.disabled = true;
+    const ready = await ensureDelegateReady();
+    if (!ready) { btn.disabled = false; return; }
+
     await startRun('delegate to akmon', ['skill', 'run', 'akmon-task', task], get('currentProject'), {
       onDone: () => { btn.disabled = false; loadSessions(); import('../app.js').then(({ triggerPollAndVerify }) => triggerPollAndVerify && triggerPollAndVerify()); },
     });
@@ -82,6 +89,8 @@ function renderShell() {
   row.appendChild(input);
   row.appendChild(btn);
   form.appendChild(row);
+  // Inline notice slot - shown when delegation isn't set up yet.
+  form.appendChild(el('div', { id: 'delegate-notice' }));
   container.appendChild(form);
 
   container.appendChild(el('div', { id: 'sessions-list', cls: 'sessions-list' }));
@@ -97,6 +106,81 @@ function renderShell() {
 function q(s) {
   if (s === '' || /[\s"'`$;|&<>(){}*?\\]/.test(s)) return `'${s.replace(/'/g, `'\\''`)}'`;
   return s;
+}
+
+/**
+ * Gate the Delegate action: delegation needs the akmon-task skill installed AND
+ * akmon detected. When either is missing, render an inline notice (with a button
+ * to Settings → Ecosystem) and return false so we never run a broken/missing
+ * skill. Returns true only when delegation is set up.
+ *
+ * Probe failures fail open (return true) - a transient probe error shouldn't
+ * block a user whose setup is actually fine; soma surfaces any real failure.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function ensureDelegateReady() {
+  const project = get('currentProject');
+  let hasSkill = false;
+  let hasAkmon = false;
+  let probed = false;
+  try {
+    const [skills, tools] = await Promise.all([
+      skillList(project).catch(() => null),
+      ecosystemInfo().catch(() => null),
+    ]);
+    if (skills !== null || tools !== null) probed = true;
+    hasSkill = Array.isArray(skills) && skills.some(s => s && s.name === 'akmon-task');
+    const akmon = Array.isArray(tools) ? tools.find(t => t && t.name === 'akmon') : null;
+    hasAkmon = !!(akmon && akmon.exists);
+  } catch (_) {
+    probed = false;
+  }
+
+  // If we couldn't probe at all, fail open rather than block a working setup.
+  if (!probed) { clearDelegateNotice(); return true; }
+  if (hasSkill && hasAkmon) { clearDelegateNotice(); return true; }
+
+  const reason = !hasSkill
+    ? 'the akmon-task skill isn’t installed'
+    : 'akmon isn’t detected on this machine';
+  showDelegateNotice(reason);
+  showToast('akmon delegation isn’t set up yet - open Settings → Ecosystem to set it up', 'error');
+  return false;
+}
+
+/** Remove the inline delegate notice, if present. */
+function clearDelegateNotice() {
+  const slot = document.getElementById('delegate-notice');
+  if (slot) slot.innerHTML = '';
+}
+
+/**
+ * Render an inline "not set up yet" notice under the delegate row, with a button
+ * that navigates to Settings → Ecosystem.
+ * @param {string} reason - short why-line (e.g. "akmon isn’t detected…")
+ */
+function showDelegateNotice(reason) {
+  const slot = document.getElementById('delegate-notice');
+  if (!slot) return;
+  slot.innerHTML = '';
+  const note = el('div', { cls: 'config-journal-note', style: 'margin-top:8px' });
+  note.appendChild(el('div', {
+    style: 'font-weight:600;margin-bottom:4px',
+    text: 'akmon delegation isn’t set up yet',
+  }));
+  note.appendChild(el('div', {
+    cls: 'dim', style: 'font-size:12px;margin-bottom:8px',
+    text: `${reason}. akmon is a separate tool soma delegates to - set it up once and Delegate will work.`,
+  }));
+  const goBtn = el('button', { cls: 'btn btn-green btn-sm', text: 'Open Settings → Ecosystem' });
+  goBtn.addEventListener('click', () => {
+    import('../app.js').then(({ navigateTo }) => {
+      if (typeof navigateTo === 'function') navigateTo('settings', { tab: 'ecosystem' });
+    }).catch(() => {});
+  });
+  note.appendChild(goBtn);
+  slot.appendChild(note);
 }
 
 /**
